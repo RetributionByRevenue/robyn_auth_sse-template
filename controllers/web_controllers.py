@@ -216,14 +216,27 @@ class WebController:
         )
         return response
     
-    def stream_events(self, request):
-        """SSE streaming endpoint for protected route"""
+    def stream_events_for_user(self, request):
+        """SSE streaming endpoint for specific user"""
         if not self._is_authenticated(request):
             return Response(
                 status_code=401,
                 description="Unauthorized",
                 headers={"Content-Type": "application/json"}
             )
+        
+        # Extract username from URL path
+        username = request.path_params.get("username")
+        
+        # Validate user exists in database
+        with SessionLocal() as db:
+            user = self.get_user_by_username(db, username)
+            if not user:
+                return Response(
+                    status_code=404,
+                    description="User not found",
+                    headers={"Content-Type": "application/json"}
+                )
         
         def event_generator():
             while True:

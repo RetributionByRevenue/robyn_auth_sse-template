@@ -28,7 +28,7 @@ def create_app():
     app.add_route("GET", "/login", web_controller.login_page)
     app.add_route("POST", "/login", web_controller.handle_login)
     app.add_route("GET", "/protected", web_controller.protected_area)
-    app.add_route("GET", "/protected/events", web_controller.stream_events)
+    app.add_route("GET", "/protected/events/:username", web_controller.stream_events_for_user)
     app.add_route("GET", "/logout", web_controller.logout)
     
     # API Routes

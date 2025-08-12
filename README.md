@@ -1,5 +1,11 @@
 # Robyn Authentication & SSE Template
 
+```
+browser-sync start --reload-delay 1000  --proxy "127.0.0.1:8080" --files "views/*.html, **/*.css, **/*.js" --no-open
+
+python3 -m robyn main.py --dev
+```
+
 A complete authentication and Server-Sent Events (SSE) template built with the [Robyn](https://github.com/sansyrox/robyn) Python web framework. This project demonstrates JWT-based authentication, database integration with SQLAlchemy, and real-time updates using Server-Sent Events.
 
 ## Features

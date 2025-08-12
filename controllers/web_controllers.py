@@ -2,7 +2,6 @@
 Web controller - handles web interface routes
 """
 
-import urllib.parse
 import time
 import json
 from datetime import datetime, timedelta
@@ -14,6 +13,8 @@ from sqlalchemy.orm import Session
 from models.database import SessionLocal
 from models.user import User
 from config import Config
+from models.courses import courses_db
+from controllers.sse_controller import sse_controller
 
 class WebController:
     """Controller for web interface"""
@@ -68,6 +69,7 @@ class WebController:
     
     def _parse_form_data(self, body: str) -> dict:
         """Parse URL-encoded form data"""
+        import urllib.parse
         form_data = {}
         if body:
             pairs = body.split('&')
@@ -76,6 +78,7 @@ class WebController:
                     key, value = pair.split('=', 1)
                     form_data[urllib.parse.unquote_plus(key)] = urllib.parse.unquote_plus(value)
         return form_data
+    
     
     def get_password_hash(self, password: str) -> str:
         """Hash a password"""
@@ -150,7 +153,7 @@ class WebController:
         
         return self.template.render_template(template_name="login.html")
     
-    def handle_login(self, request):
+    async def handle_login(self, request):
         """Process login form submission"""
         try:
             form_data = self._parse_form_data(request.body)
@@ -182,6 +185,7 @@ class WebController:
                     "Set-Cookie": f"access_token={token}; Max-Age=3600; Path=/; HttpOnly"
                 }
             )
+            await sse_controller.create_user_queue(username)
             return response
         else:
             # Failed login
@@ -199,11 +203,42 @@ class WebController:
         if not username:
             return self._redirect("/login")
         
+        courses = courses_db.get_courses()
         return self.template.render_template(
             template_name="protected.html", 
-            username=username
+            username=username,
+            courses=courses
         )
     
+    async def add_course(self, request):
+        """Add a new course from form submission"""
+        if not self._is_authenticated(request):
+            return self._redirect("/login")
+
+        try:
+            form_data = request.form_data
+            print("called!")
+            course_title = form_data.get("course_title")
+            print(course_title)
+            if course_title:
+                courses_db.add_course(course_title)
+                username = self._get_current_user(request)
+                print(username)
+                if username:
+                    courses = courses_db.get_courses()
+                    html = (
+                        '<ul>'
+                        + ''.join(f'<li>{course}</li>' for course in courses)
+                        + '</ul>'
+                    )
+                    message_data = {"html": {f"course_list_{username}": html}}
+                    print("sent:",json.dumps(message_data))
+                    await sse_controller.add_to_queue(username, json.dumps(message_data))
+        except Exception as e:
+            print(f"Error adding course: {e}") # For debugging
+        
+        return self._redirect("/protected")
+
     def logout(self, request):
         """Logout user - clear JWT token"""
         response = Response(
@@ -215,33 +250,4 @@ class WebController:
             }
         )
         return response
-    
-    def stream_events_for_user(self, request):
-        """SSE streaming endpoint for specific user"""
-        if not self._is_authenticated(request):
-            return Response(
-                status_code=401,
-                description="Unauthorized",
-                headers={"Content-Type": "application/json"}
-            )
-        
-        # Extract username from URL path
-        username = request.path_params.get("username")
-        
-        # Validate user exists in database
-        with SessionLocal() as db:
-            user = self.get_user_by_username(db, username)
-            if not user:
-                return Response(
-                    status_code=404,
-                    description="User not found",
-                    headers={"Content-Type": "application/json"}
-                )
-        
-        def event_generator():
-            while True:
-                yield SSEMessage('''{"js": {"exec": "console.log('News updated!')"}}''')
-                time.sleep(2)
-        
-        return SSEResponse(event_generator())
     

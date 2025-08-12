@@ -2,13 +2,14 @@
 <html>
 <head>
     <title>Protected Area</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <style>
         body { font-family: Arial, sans-serif; margin: 50px; }
         .container { max-width: 600px; margin: 0 auto; }
         .welcome { color: #007cba; }
         a { color: #007cba; text-decoration: none; }
     </style>
-    <script>
+<script>
 /**
  * SSEXI.js - SSE + Fixi: Declarative Server-Sent Events for Hypermedia
  * Inspired by fixi.js but focused on SSE-driven DOM updates
@@ -107,8 +108,10 @@
         
         // Message handler - supports your SSE message format
         eventSource.onmessage = (event) => {
+            console.log("SSE message received:", event.data);
             try {
                 const update = JSON.parse(event.data);
+                console.log("Parsed SSE update:", update);
                 
                 if (!send(elt, "message", { update, endpoint })) return;
                 
@@ -129,15 +132,21 @@
                 
                 // Handle HTML updates
                 if (update.html) {
+                    console.log("Processing HTML updates:", update.html);
                     Object.entries(update.html).forEach(([elementId, htmlContent]) => {
+                        console.log("Updating element:", elementId, "with content:", htmlContent);
                         const targetElement = document.getElementById(elementId);
                         if (targetElement) {
+                            console.log("Target element found:", targetElement);
                             const doUpdate = () => {
                                 const temp = document.createElement('div');
                                 temp.innerHTML = htmlContent;
+                                console.log("Temp element created with innerHTML:", temp.innerHTML);
                                 const newElement = temp.querySelector(targetElement.tagName);
+                                console.log("Looking for tagName:", targetElement.tagName, "found:", newElement);
                                 
                                 if (newElement) {
+                                    console.log("New element found, updating content...");
                                     // Clear existing content
                                     while (targetElement.firstChild) {
                                         targetElement.removeChild(targetElement.firstChild);
@@ -161,13 +170,18 @@
                                         }
                                     });
                                     
+                                    console.log("Element content updated successfully");
                                     send(elt, "html-updated", { elementId, targetElement });
+                                } else {
+                                    console.log("No matching element found in HTML content, updating innerHTML directly");
+                                    targetElement.innerHTML = htmlContent;
                                 }
                             };
                             
                             // Simple update without view transitions
                             doUpdate();
                         } else {
+                            console.log("Target element not found for ID:", elementId);
                             send(elt, "html-error", { elementId, error: "Element not found" });
                         }
                     });
@@ -176,19 +190,23 @@
                 send(elt, "processed", { update });
                 
             } catch (error) {
+                console.log("Error parsing SSE message:", error, "raw data:", event.data);
                 send(elt, "parse-error", { error, data: event.data });
             }
         };
         
         // Error handler with auto-reconnect
         eventSource.onerror = (error) => {
+            console.log("SSE connection error:", error, "for endpoint:", endpoint);
             send(elt, "error", { error, endpoint });
             eventSource.close();
             connections.delete(endpoint);
             
             // Auto-reconnect after 5 seconds
+            console.log("Attempting to reconnect in 5 seconds...");
             setTimeout(() => {
                 if (document.contains(elt) && !ignore(elt)) {
+                    console.log("Reconnecting to SSE endpoint:", endpoint);
                     initSSE(elt);
                 }
             }, 5000);
@@ -196,6 +214,7 @@
         
         // Connection established
         eventSource.onopen = () => {
+            console.log("SSE connection established to:", endpoint);
             send(elt, "connected", { endpoint });
         };
         
@@ -240,12 +259,32 @@
         version: "1.0.0"
     };
 })();
-    </script>
+</script>
 </head>
-<body sx-connect="/protected/events/{{ username }}">
+<body sx-connect="/stream/{{ username }}">
     <div class="container">
         <h1 class="welcome">Welcome, {{ username }}!</h1>
         <p>You have successfully accessed the protected area.</p>
+
+        <h2>Add New Course</h2>
+        <form sx-post="/add_course" sx-swap="none">
+            <label for="course_title">Course Title:</label><br>
+            <input type="text" id="course_title" name="course_title" required><br><br>
+            <input type="submit" value="Add Course">
+        </form>
+
+        <h2>Your Courses</h2>
+        <div id="course_list_{{ username }}">
+        {% if courses %}
+            <ul>
+                {% for course in courses %}
+                    <li>{{ course }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No courses added yet.</p>
+        {% endif %}
+        </div>
         <a href="/logout">Logout</a>
     </div>
 </body>

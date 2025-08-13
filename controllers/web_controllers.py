@@ -143,18 +143,18 @@ class WebController:
         return token
     
     def redirect_to_login(self, request):
-        """Root route - redirect to login"""
+        """GET / - Root route - redirect to login"""
         return self._redirect("/login")
     
     def login_page(self, request):
-        """Display login form"""
+        """GET /login - Display login form"""
         if self._is_authenticated(request):
             return self._redirect("/protected")
         
         return self.template.render_template(template_name="login.html")
     
     async def handle_login(self, request):
-        """Process login form submission"""
+        """POST /login - Process login form submission"""
         try:
             form_data = self._parse_form_data(request.body)
             username = form_data.get("username")
@@ -195,7 +195,7 @@ class WebController:
             )
     
     def protected_area(self, request):
-        """Protected area - requires authentication"""
+        """GET /protected - Protected area - requires authentication"""
         if not self._is_authenticated(request):
             return self._redirect("/login")
         
@@ -211,7 +211,7 @@ class WebController:
         )
     
     async def add_course(self, request):
-        """Add a new course from form submission"""
+        """POST /add_course - Add a new course from form submission"""
         if not self._is_authenticated(request):
             return self._redirect("/login")
 
@@ -240,7 +240,7 @@ class WebController:
         return self._redirect("/protected")
 
     def logout(self, request):
-        """Logout user - clear JWT token"""
+        """GET /logout - Logout user - clear JWT token"""
         response = Response(
             status_code=302,
             description="",
